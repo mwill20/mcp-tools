@@ -1,2 +1,6 @@
 gradio[mcp]
+<<<<<<< HEAD
 textblob
+=======
+textblob
+>>>>>>> f35176e8251c00706b739c2e17dffb5e9cc112ab
