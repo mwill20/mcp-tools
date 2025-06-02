@@ -1,5 +1,5 @@
 from typing import Dict, Any, Literal
-from smolagents import tool
+from smolagents.tools import tool
 
 @tool
 def simple_calculator(operand1: float, operand2: float, operation: str) -> float:

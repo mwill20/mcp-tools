@@ -1,8 +1,21 @@
 import os
+import sys
+import logging
 import gradio as gr
 from textblob import TextBlob
 from dotenv import load_dotenv
 from tools import get_current_weather, simple_calculator
+
+# Set up logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler("mcp_app.log"),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
@@ -23,6 +36,9 @@ else:
     SERVER_PORT = int(os.getenv('SERVER_PORT', '7860'))
     MCP_SERVER = os.getenv('MCP_SERVER', 'True').lower() == 'true'
 
+from smolagents.tools import tool
+
+@tool
 def sentiment_analysis(text: str) -> dict:
     """
     Performs sentiment analysis on the input text.
@@ -112,47 +128,47 @@ with gr.Blocks(title="MCP Tools") as demo:
             outputs=result
         )
 
-# MCP tools to expose
-mcp_tools = [
-    {"name": "sentiment_analysis", "function": sentiment_analysis},
-    get_current_weather,
-    simple_calculator
-]
+# MCP tools to expose - all are already decorated with @tool
 
 if __name__ == "__main__":
-    print(f"Starting server on http://{SERVER_NAME}:{SERVER_PORT}")
+    logger.info(f"Starting server on http://{SERVER_NAME}:{SERVER_PORT}")
     
-    # Try to set up MCP if enabled
+    # Configure MCP endpoints if enabled
     if MCP_SERVER:
-        print("MCP Server: Enabled")
+        logger.info("MCP Server: Enabled")
         try:
-            # Try to import and use MCP if available
-            from gradio.mcp import MCP
-            mcp = MCP()
+            # In Gradio 5.32.0, MCP endpoints are automatically created for functions
+            # decorated with @tool from smolagents.tools
+            logger.info("MCP endpoints will be automatically created for @tool decorated functions")
             
-            # Register tools with MCP
-            for tool in mcp_tools:
-                if isinstance(tool, dict):
-                    mcp.register(tool['function'], name=tool.get('name'))
-                else:
-                    mcp.register(tool)
-            
-            # Launch with MCP
+            # Launch with MCP support
+            logger.info("Launching Gradio with MCP support...")
             demo.launch(
                 server_name=SERVER_NAME,
                 server_port=SERVER_PORT,
                 debug=True,
-                show_error=True,
-                mcp=mcp
+                show_error=True
             )
+            logger.info("Launched with MCP support.")
+            logger.info(f"MCP endpoints available at: http://{SERVER_NAME}:{SERVER_PORT}/mcp/tools/{{tool_name}}/call")
         except Exception as e:
-            print(f"Failed to initialize MCP: {e}")
-            print("Falling back to standard launch without MCP")
-            MCP_SERVER = False
-    
-    # Standard launch without MCP
-    if not MCP_SERVER:
-        print("MCP Server: Disabled")
+            logger.error(f"Failed to launch with MCP: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            logger.info("Falling back to standard launch without MCP.")
+            
+            # Standard launch without MCP
+            logger.info("Launching Gradio without MCP...")
+            demo.launch(
+                server_name=SERVER_NAME,
+                server_port=SERVER_PORT,
+                debug=True,
+                show_error=True
+            )
+    else:
+        # Standard launch without MCP
+        logger.info("MCP Server: Disabled by configuration.")
+        logger.info("Launching Gradio without MCP...")
         demo.launch(
             server_name=SERVER_NAME,
             server_port=SERVER_PORT,

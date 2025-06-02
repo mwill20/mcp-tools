@@ -1,6 +1,7 @@
 from typing import Dict, Any, Optional
-from smolagents import tool
+from smolagents.tools import tool
 
+# Use the basic tool decorator without parameters
 @tool
 def get_current_weather(location: str, unit: str = 'celsius') -> str:
     """
