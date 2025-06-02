@@ -1,3 +1,5 @@
-gradio[mcp]
+gradio>=3.0.0
 textblob
+smolagents>=0.1.0
+python-dotenv
 

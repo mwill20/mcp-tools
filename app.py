@@ -1,5 +1,27 @@
+import os
 import gradio as gr
 from textblob import TextBlob
+from dotenv import load_dotenv
+from tools import get_current_weather, simple_calculator
+
+# Load environment variables
+load_dotenv()
+
+# Get server configuration from environment variables
+# Use environment variables for Hugging Face Spaces
+HF_SPACE = os.environ.get('SPACE_ID') is not None
+
+# Server configuration
+if HF_SPACE:
+    # Configuration for Hugging Face Spaces
+    SERVER_NAME = '0.0.0.0'
+    SERVER_PORT = 7860
+    MCP_SERVER = False  # Disable MCP in Hugging Face for now
+else:
+    # Local development configuration
+    SERVER_NAME = os.getenv('SERVER_NAME', '0.0.0.0')
+    SERVER_PORT = int(os.getenv('SERVER_PORT', '7860'))
+    MCP_SERVER = os.getenv('MCP_SERVER', 'True').lower() == 'true'
 
 def sentiment_analysis(text: str) -> dict:
     """
@@ -28,14 +50,112 @@ def sentiment_analysis(text: str) -> dict:
         "assessment": assessment
     }
 
-iface = gr.Interface(
-    fn=sentiment_analysis,
-    inputs=gr.Textbox(lines=2, placeholder="Enter text for sentiment analysis..."),
-    outputs=gr.JSON(),
-    title="Sentiment Analysis Tool (MCP Enabled)",
-    description="Enter text to get its sentiment polarity, subjectivity, and a qualitative assessment. This server is MCP enabled."
-)
+def weather_interface(location: str, unit: str) -> str:
+    """Gradio interface function for weather tool"""
+    return get_current_weather(location=location, unit=unit)
+
+def calculator_interface(operand1: float, operand2: float, operation: str) -> float:
+    """Gradio interface function for calculator tool"""
+    return simple_calculator(operand1, operand2, operation)
+
+# Create tabbed interface
+with gr.Blocks(title="MCP Tools") as demo:
+    gr.Markdown("# MCP Tools Dashboard")
+    
+    with gr.Tab("Sentiment Analysis"):
+        with gr.Row():
+            text_input = gr.Textbox(
+                lines=3, 
+                placeholder="Enter text for sentiment analysis...",
+                label="Input Text"
+            )
+        analyze_btn = gr.Button("Analyze Sentiment")
+        sentiment_output = gr.JSON(label="Analysis Results")
+        analyze_btn.click(
+            fn=sentiment_analysis,
+            inputs=text_input,
+            outputs=sentiment_output
+        )
+    
+    with gr.Tab("Weather Tool"):
+        with gr.Row():
+            location = gr.Textbox(label="Location", placeholder="e.g., Paris, FR")
+            unit = gr.Radio(
+                ["celsius", "fahrenheit"], 
+                label="Temperature Unit", 
+                value="celsius"
+            )
+        weather_btn = gr.Button("Get Weather")
+        weather_output = gr.Textbox(label="Weather Information")
+        weather_btn.click(
+            fn=weather_interface,
+            inputs=[location, unit],
+            outputs=weather_output
+        )
+    
+    with gr.Tab("Calculator"):
+        with gr.Row():
+            with gr.Column():
+                operand1 = gr.Number(label="First Number")
+                operand2 = gr.Number(label="Second Number")
+                operation = gr.Dropdown(
+                    ["add", "subtract", "multiply", "divide"],
+                    label="Operation",
+                    value="add"
+                )
+                calc_btn = gr.Button("Calculate")
+            result = gr.Number(label="Result")
+            
+        calc_btn.click(
+            fn=calculator_interface,
+            inputs=[operand1, operand2, operation],
+            outputs=result
+        )
+
+# MCP tools to expose
+mcp_tools = [
+    {"name": "sentiment_analysis", "function": sentiment_analysis},
+    get_current_weather,
+    simple_calculator
+]
 
 if __name__ == "__main__":
-    # Launch the server with mcp_server=True to enable the MCP endpoint
-    iface.launch(mcp_server=True)
+    print(f"Starting server on http://{SERVER_NAME}:{SERVER_PORT}")
+    
+    # Try to set up MCP if enabled
+    if MCP_SERVER:
+        print("MCP Server: Enabled")
+        try:
+            # Try to import and use MCP if available
+            from gradio.mcp import MCP
+            mcp = MCP()
+            
+            # Register tools with MCP
+            for tool in mcp_tools:
+                if isinstance(tool, dict):
+                    mcp.register(tool['function'], name=tool.get('name'))
+                else:
+                    mcp.register(tool)
+            
+            # Launch with MCP
+            demo.launch(
+                server_name=SERVER_NAME,
+                server_port=SERVER_PORT,
+                debug=True,
+                show_error=True,
+                mcp=mcp
+            )
+        except Exception as e:
+            print(f"Failed to initialize MCP: {e}")
+            print("Falling back to standard launch without MCP")
+            MCP_SERVER = False
+    
+    # Standard launch without MCP
+    if not MCP_SERVER:
+        print("MCP Server: Disabled")
+        demo.launch(
+            server_name=SERVER_NAME,
+            server_port=SERVER_PORT,
+            debug=True,
+            show_error=True
+        )
