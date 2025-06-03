@@ -1,5 +1,6 @@
 from typing import Dict, Any, Optional
 from smolagents.tools import tool
+import random
 
 # Use the basic tool decorator without parameters
 @tool
@@ -18,5 +19,21 @@ def get_current_weather(location: str, unit: str = 'celsius') -> str:
         raise ValueError("Location is required")
         
     print(f"Fetching weather for {location} in {unit}...")
-    # TODO: Implement API call to weather service
-    return f"Weather in {location}: 22°{unit[0].upper()}, Sunny"  # Mock response
+    
+    # Mock temperature in Celsius (base value)
+    temp_celsius = 22
+    
+    # Convert temperature based on the requested unit
+    if unit.lower() == 'fahrenheit':
+        # Convert Celsius to Fahrenheit: (C × 9/5) + 32
+        temp = round((temp_celsius * 9/5) + 32)
+        unit_symbol = 'F'
+    else:  # Default to Celsius
+        temp = temp_celsius
+        unit_symbol = 'C'
+    
+    # List of possible weather conditions
+    conditions = ["Sunny", "Partly Cloudy", "Cloudy", "Light Rain", "Clear"]
+    condition = random.choice(conditions)
+    
+    return f"Weather in {location}: {temp}°{unit_symbol}, {condition}"
