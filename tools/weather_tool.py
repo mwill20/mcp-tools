@@ -40,8 +40,17 @@ def get_current_weather(location: str, unit: str = 'celsius') -> str:
 
 def get_real_weather(location: str, unit: str) -> str:
     """Get real weather data from a weather API"""
+    # Check if running on Hugging Face Space
+    is_hf_space = os.environ.get('SPACE_ID') is not None
+    logger.info(f"Running on Hugging Face Space: {is_hf_space}")
+    
     # Get API key from environment variable
     api_key = os.getenv('WEATHER_API_KEY')
+    
+    # Log environment variables for debugging (without exposing the actual key)
+    env_vars = [k for k in os.environ.keys() if 'API' in k or 'KEY' in k or 'WEATHER' in k or 'HF_' in k or 'SPACE' in k]
+    logger.info(f"Available environment variables that might contain API keys: {env_vars}")
+    logger.info(f"API key found: {api_key is not None}")
     
     if not api_key:
         logger.warning("No WEATHER_API_KEY found in environment variables")
@@ -54,14 +63,24 @@ def get_real_weather(location: str, unit: str) -> str:
     # Make API request to OpenWeatherMap (you can replace with your preferred API)
     url = f"https://api.openweathermap.org/data/2.5/weather?q={location}&units={units}&appid={api_key}"
     
-    response = requests.get(url)
-    response.raise_for_status()  # Raise exception for HTTP errors
+    logger.info(f"Making API request to: {url.replace(api_key, 'API_KEY_HIDDEN')}")
     
-    data = response.json()
-    temp = round(data["main"]["temp"])
-    condition = data["weather"][0]["main"]
+    try:
+        response = requests.get(url, timeout=10)
+        response.raise_for_status()  # Raise exception for HTTP errors
+        logger.info(f"API response status code: {response.status_code}")
     
-    return f"Weather in {location}: {temp}°{unit_symbol}, {condition}"
+        data = response.json()
+        logger.info(f"API response data keys: {data.keys()}")
+        
+        temp = round(data["main"]["temp"])
+        condition = data["weather"][0]["main"]
+        
+        logger.info(f"Successfully parsed weather data: {temp}°{unit_symbol}, {condition}")
+        return f"Weather in {location}: {temp}°{unit_symbol}, {condition}"
+    except Exception as e:
+        logger.error(f"Error during API request or parsing: {str(e)}")
+        raise
 
 def get_mock_weather(location: str, unit: str) -> str:
     """Provide mock weather data as a fallback"""
