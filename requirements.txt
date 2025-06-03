@@ -2,3 +2,4 @@ gradio==5.32.1
 textblob==0.15.3
 smolagents==1.17.0
 python-dotenv==1.0.0
+requests==2.31.0
